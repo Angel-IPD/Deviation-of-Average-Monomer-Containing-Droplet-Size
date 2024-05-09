@@ -1,6 +1,9 @@
 import numpy as np
 import math
 from scipy.special import erf
+import matplotlib.pyplot as plt
+from scipy.stats import lognorm
+from scipy.integrate import quad
 
 # Constants and variables initialization
 mean = 10**4  # mean droplet size
@@ -65,12 +68,28 @@ num_times = 50  # Number of points in the range
 # Run simulation and calculate deviations
 a_values, deviations = Run_simulation_and_deviation(1000, a_start, a_end, num_times)
 
+# Log-normal distribution function using scipy
+s = delta  # Shape parameter for scipy's lognorm
+scale = np.exp(mu)  # Scale parameter for scipy's lognorm
+
+# Define the theoretical model function
+def expected_monomer_size(a):
+    """Calculate the expected size of droplets picking up exactly one dopant."""
+    integral_numerator = lambda n: n * lognorm.pdf(n, s, scale=scale) * (a * n**(2/3) * np.exp(-a * n**(2/3))) #Calculate the expected value of the droplet size
+    integral_denominator = lambda n: lognorm.pdf(n, s, scale=scale) * (a * n**(2/3) * np.exp(-a * n**(2/3))) #Calculate the expected value of droplet size given that it contains a monomer
+    numerator, _ = quad(integral_numerator, 0, 10000000) #for upper bounds use either np.inf or a very high number so that the function essentially becomes negligible
+    denominator, _ = quad(integral_denominator, 0, 10000000) #for upper bounds use either np.inf or a very high number so that the function essentially becomes negligible
+    return numerator / denominator if denominator else mean
+
+theoretical_deviations = [mean - expected_monomer_size(a) for a in a_values]
+
 # Plotting the results
-import matplotlib.pyplot as plt
 plt.figure(figsize=(12, 8))
-plt.plot(a_values, deviations, marker='o', linestyle='-')
+plt.plot(a_values, theoretical_deviations, 'r-', label='Theoretical Model')
+plt.plot(a_values, deviations, 'bo-', label='Monte Carlo Simulation')
 plt.title('Deviation of Average Monomer-Containing Droplet Size' )
 plt.xlabel('Pickup Probability Parameter (a)')
 plt.ylabel('Deviation from <N>')
 plt.grid(True)
 plt.show()
+
